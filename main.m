@@ -5,7 +5,7 @@ clear; close all; clc;
 %% User Input Section
 % Default values
 default_L = 8;          % Quantization levels (bits)
-reader = dsp.AudioFileReader('odonnellyougogirl.wav');
+reader = dsp.AudioFileReader('pianos-by-jtwayne-7-174717.mp3');
 disp('Reading audio file...');
 input_signal = [];
 fs = 0;
@@ -32,13 +32,11 @@ encoding_type = 'polar';  % Encoding type
 
 % Normalize input signal to range [-mp, mp]
 input_signal = input_signal / max(abs(input_signal)) * mp;
-% --- Channel Parameters ---
-% Choose channel type: 'awgn', 'rayleigh', 'rician', 'impulsive'
-channel_selection = 'awgn'; % <-- Đặt kênh Rayleigh tại đây
-fd = 10; % Maximum Doppler Shift (Hz) for fading channels (e.g., 10 for slow movement)
-K_factor = 3; % K-factor for Rician channel (dB). Higher K means stronger LoS.
-SNR_range = -10:2:10; % Dải SNR từ -10 dB đến 10 dB, bước nhảy 2 dB.
-ber_results = zeros(size(SNR_range)); % Mảng để lưu trữ BER cho mỗi SNR
+chanel_range={'awgn','rayleigh','rician'};
+fd = 10; 
+K_factor = 3; 
+SNR_range = -10:2:10;
+ber_results = zeros(length(chanel_range), length(SNR_range)); % Mảng để lưu trữ BER cho mỗi SNR
 
 impulsive_noise_probability = 0.01; % Probability of an impulse occurring (0 to 1)
 impulsive_noise_amplitude_factor = 10; % Factor to multiply max signal amplitude for impulse (e.g., 10 means 10 times max signal)
@@ -69,7 +67,9 @@ len_ber_total = length(original_bits_for_ber); % Total bits for BER comparison
 
 % Define t_encoded based on the full encoded_signal
 t_encoded = linspace(0, t(end), length(encoded_signal));
-
+for i=1:length(chanel_range)
+channel_selection = chanel_range(i);
+disp(channel_selection);
 %% Loop for BER vs SNR Calculation
 % This loop processes the signal through the channel for each SNR value
 for snr_idx = 1:length(SNR_range)
@@ -107,11 +107,9 @@ for snr_idx = 1:length(SNR_range)
 
     elseif strcmp(channel_selection, 'impulsive')
         received_signal_current_snr = awgn(encoded_signal(:), current_SNR_dB, 'measured');
-        
         % Add Impulsive Noise
         num_samples = length(received_signal_current_snr);
         impulse_peak_amplitude = impulsive_noise_amplitude_factor * max(abs(encoded_signal(:)));
-        
         impulse_locations = rand(num_samples, 1) < impulsive_noise_probability;
         impulse_noise = zeros(num_samples, 1);
         impulse_noise(impulse_locations) = impulse_peak_amplitude * (2*rand(sum(impulse_locations),1)-1); 
@@ -140,7 +138,7 @@ for snr_idx = 1:length(SNR_range)
     [numErrors_manual, ber_manual] = biterr(original_bits_for_ber_truncated, recovered_bits_for_ber_truncated);
 
     % Store BER result in the array
-    ber_results(snr_idx) = ber_manual;
+    ber_results(i,snr_idx) = ber_manual;
 
     disp(['Total bits compared: ', num2str(min_len_ber)]); % Show actual bits compared
     disp(['Bit errors: ', num2str(numErrors_manual)]);
@@ -150,30 +148,27 @@ for snr_idx = 1:length(SNR_range)
     % If you want to plot Constellation Diagram or Reconstructed Signal for a SPECIFIC SNR,
     % you would do it here or save these signals to an array.
     % For now, we'll use the last SNR's results for the final Constellation/Reconstructed plots.
+     % Explicitly name figure
+      
+
 end
-
+end
 %% Plotting BER vs SNR Curve (THIS IS THE PRIMARY PLOT YOU ARE LOOKING FOR)
-figure('Name', ['BER vs SNR Curve for ' upper(channel_selection) ' Channel'], 'NumberTitle', 'on'); % Explicitly name figure
-semilogy(SNR_range, ber_results, 'b-o', 'LineWidth', 1.5, 'MarkerSize', 6);
+figure; % Explicitly name figure
+semilogy(SNR_range, ber_results(1,:), 'b-o', 'LineWidth', 1.5, 'MarkerSize', 6); % AWGN
 hold on;
+semilogy(SNR_range, ber_results(2,:), 'r-x', 'LineWidth', 1.5, 'MarkerSize', 6); % Rayleigh
+semilogy(SNR_range, ber_results(3,:), 'g-s', 'LineWidth', 1.5, 'MarkerSize', 6); % Rician
 grid on;
-
 xlabel('SNR (dB)');
 ylabel('Bit Error Rate (BER)');
 title(['BER vs SNR for ', upper(channel_selection), ' Channel']);
 xlim([min(SNR_range), max(SNR_range)]);
+
+legend('awgn','rayleigh','rician');
 % Adjust ylim based on expected BER values. 1e-6 to 1 is a good general range.
-ylim([max(1e-6, min(ber_results)/10), 1]); % Dynamically adjust lower limit, but not below 1e-6
 
 % Add Theoretical BER for BPSK (for Polar NRZ) on AWGN channel
-if strcmp(channel_selection, 'awgn') && strcmp(encoding_type, 'polar')
-    Eb_No_linear = 10.^(SNR_range/10);
-    ber_theoretical_bpsk_awgn = 0.5 * erfc(sqrt(Eb_No_linear));
-    semilogy(SNR_range, ber_theoretical_bpsk_awgn, 'r--', 'LineWidth', 1.5);
-    legend('Simulated BER', 'Theoretical BER (BPSK, AWGN)', 'Location', 'southwest');
-else
-    legend('Simulated BER', 'Location', 'southwest');
-end
 hold off; % Release hold after adding all elements to this figure
 
 %% Other Plotting (Signal Waveforms and Constellation Diagram - using data from LAST SNR iteration)
