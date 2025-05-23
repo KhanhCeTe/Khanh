@@ -1,9 +1,4 @@
-%% PCM System Simulator - Main Script
-% Omar ElShazli - Omar Hagras - John Besada - Hala Refaie
-% Modified to use WAV file input
 clear; close all; clc;
-%% User Input Section
-% Default values
 default_L = 8;          % Quantization levels (bits)
 reader = dsp.AudioFileReader('pianos-by-jtwayne-7-174717.mp3');
 disp('Reading audio file...');
